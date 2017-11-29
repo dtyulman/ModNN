@@ -2,7 +2,7 @@ function [a,z] = feedforward(W, b, x)
 
 L = length(W);
 z = cell(1,L);
-a = cell(size(z));
+a = cell(1,L);
 a{1} = x';
 for r = 2:L
     z{r} = W{r}'*a{r-1} + b{r};

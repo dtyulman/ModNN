@@ -1,11 +1,28 @@
 %% load data
-%{
+%-{
 datapath = 'MNIST/';
-[Xtr, Ytr, Xv, Yv, Xte, Yte] = loadMNIST(datapath, 0:9, 200, 1, 150);
+Ntr = 200; %N samples of each digit
+Nv = 150;
+Nte = 150;
+digits = 0:9; %which digits to load
+[Xtr, Ytr, Xv, Yv, Xte, Yte] = loadMNIST(datapath, digits, Ntr, Nv, Nte); %train, valid, test sets
 %}
 
-%% initialize
+% convert raw data to "neural network" space
+%-{
+eta_m2n = .005;
+thres_m2n = 1e-6;
+batchSize_m2n = 100;
+maxIters_m2n = 5000;
 
+dimRep = 100;
+layerRep = 2;
+layers_m2n = [size(Xtr,2), dimRep, Nh1, size(Ytr,2)];
+[W_init_m2n, b_init_m2n] = initNN(layers_m2n, 'initseed.mat');
+
+[Xtr, Xv, Xte, W_m2n, b_m2n] = mnist2nn(layers_m2n, Xtr, Ytr, Xv, Yv, Xte, layerRep, eta_m2n, thres_m2n, batchSize_m2n, maxIters_m2n);
+%}      
+%% initialize
 for Nh1 = 100 %[20 50 100] %number of hidden units in layer
     for Nc = 1 %[1, 2, 5, 10] %number of clusters
         if mod(Nh1/Nc,1) ~= 0
@@ -14,15 +31,20 @@ for Nh1 = 100 %[20 50 100] %number of hidden units in layer
         
         eta = .005;
         thres = -inf; %1e-8;
+        if thres == -inf
+            Xv = Xv(1,:); %ignore validation set because running to maxIters regardless
+            Yv = Yv(1,:); %need to leave one entry so that it doesn't throw error TODO: fix this
+        end     
         batchSize = 100;
         maxIters = 10000;
         
         layers = [size(Xtr,2), Nh1, size(Ytr,2)]; %rth layer has <layers(r)> units
         splits = [1 Nc 1]; %rth layer has <splits(r)> sublayers with <layers(r)>/<splits(r)> units each (must be divisible)
         
-        [W_init, b_init] = initNN(layers, 'initseed.mat');
-        centroid_init = initKmeans(Xtr, Nc, 'initseed.mat');
+        [W_init, b_init] = initNN(layers, 'initseedpreproc.mat');
+        centroid_init = initKmeans(Xtr, Nc, 'initseedpreproc.mat');
         
+        %% Sanity check - run network of size Nh1/Nc on just one of the clusters      
 %         % cluster training set and assign test/valid set to nearest cluster centroid       
 %         [Xtr_clust, centroids] = kmeans(Xtr, Nc, 'Start', centroid_init);
 %         Xv_clust = knnsearch(centroids, Xv);
@@ -43,7 +65,7 @@ for Nh1 = 100 %[20 50 100] %number of hidden units in layer
             trainClustNN(W_init, b_init, Xtr, Ytr, Xv, Yv, centroid_init, splits, eta, thres, batchSize, maxIters);
         toc       
         %% test
-        for splitTest = [0,1]
+        for splitTest = [0,1] %TODO: remove this, this is not a good idea
             if ~splitTest
                 splitsTest=ones(1, length(splits));
             else

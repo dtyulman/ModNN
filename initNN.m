@@ -20,7 +20,7 @@ if nargin == 1
     %     b{r} = random('Normal', 0, 1/sqrt(layers(r-1)), layers(r), 1);
         b{r} = zeros(layers(r), 1);
     end
-elseif nargin == 2
+elseif nargin == 2 %TODO: I can actually do this by just seeding the RNG...
     layerStr = sprintf('_%d', layers);
     Wvar = ['W', layerStr];
     bvar = ['b', layerStr];

@@ -11,6 +11,16 @@ Yv = [];
 Xte  = []; 
 Yte  = [];
 
+% TODO: make for-loop assign to correct slots here
+% Npix = 26*26; %number of pixels
+% Ndigs = length(digits); %number of digits;
+% 
+% Xtr = zeros(Ndigs*Ntr, Npix); 
+% Ytr = zeros(Ndigs*Ntr, Ndigs);
+% Xv = zeros(Ndigs*Nv, Npix); 
+% Yv = zeros(Ndigs*Nv, Ndigs);
+% Xte = zeros(Ndigs*Nte, Npix); 
+% Yte = zeros(Ndigs*Nte, Ndigs);
 
 for d = digits
     data = importdata(strcat(datapath, 'mnist_digit_', num2str(d), '.csv'));
