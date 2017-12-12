@@ -1,5 +1,5 @@
-function [W_all, b_all, centroids, R_all, iter] = ...
-    trainClustNN(W_init, b_init, Xtr, Ytr, Xv, Yv, clust, splits, eta, thres, batchSize, maxIters)
+function [W_all, b_all, centroids, R_all, iter, f_thres] = ...
+    trainClustNN(W_init, b_init, Xtr, Ytr, Xv, Yv, clust, splits, eta, Wlims, binDelta, f, convThres, batchSize, maxIters)
 % W is a cell array, so that W{r} is the weight matrix for layer r. If
 %   layer r has n neurons and layer r-1 has m neurons, W{r} is m-by-n
 %   (i.e. for every one of the n neurons in layer r, there is a length-m weight 
@@ -13,17 +13,37 @@ function [W_all, b_all, centroids, R_all, iter] = ...
 %
 % All hidden units are ReLU, all output units are Softmax, loss function is cross-entropy 
 
+
+%%
+% This is getting out of control and needs to be rewritten as OOP or need to do
+% some better input parsing with varargin. Existing mods from standard FF NN:
+% - Modular (precluster, activate subnetworks)
+% - Batch GD instead of SGD
+% - Upper/lower bound on W
+% - Binarized DeltaW
+% - Store all intermediate W,b
+% - Sparsify i.e. fraction f of DeltaW is nonzero
+
 %% defaults and convenience vars
 L = length(W_init); %number of layers
 
-if nargin < 12 || isempty(maxIters)
+if nargin < 15 || isempty(maxIters)
     maxIters = 10000;
 end
-if nargin < 11 || isempty(batchSize)
+if nargin < 14 || isempty(batchSize)
     batchSize = 1; %default to SGD
 end
-if nargin < 10  || isempty(thres)
-    thres = 0.1;
+if nargin < 13  || isempty(convThres)
+    convThres = 0.1;
+end
+if nargin < 12
+    f = 1; %all Ws nonzero
+end
+if nargin < 11
+    binDelta = false;
+end
+if nargin < 10 || isempty(Wlims)
+    Wlims = [-inf, inf];
 end
 if nargin < 9 || isempty(eta)
     eta = 1;
@@ -41,10 +61,21 @@ else
     Nc=size(clust,1); %...or centroid initialization (Nc-by-d) for kmeans.
 end
 
+Wmin = Wlims(1);
+Wmax = Wlims(2);
+if Wmin > -inf || Wmax < inf
+    fprintf('Limiting weights to range [%g, %g]\n', Wmin, Wmax)
+end
+if binDelta
+    fprintf('Binarizing delta W')
+end
+
 cellfun_add = @(C1,C2){C1+C2};
 cellfun_sub = @(C1,C2){C1-C2};
 cellfun_scale = @(C){eta/batchSize*C};
 cellfun_zero = @(C){0*C};
+cellfun_binarize = @(C){sign(C)};
+cellfun_boundW = @(C){max(Wmin, min(Wmax, C))};
 
 %% input/sanity checking
 if ~isempty(W_init{1})
@@ -101,6 +132,10 @@ if batchSize > size(Xtr, 1)
     warning('Batch size greater than training set. Setting batch size to length of training set.')
     batchSize = size(Xtr, 1);
 end
+if Wmin >= Wmax
+    error('Lower bound on W must be less than upper bound')
+end
+
 
 %% cluster
 if isscalar(clust)
@@ -158,8 +193,12 @@ for iter = 1:maxIters
     %%  
        
     %update parameters
+    if binDelta
+        dldW = cellfun(cellfun_binarize, dldW);
+    end
     W_step = cellfun(cellfun_scale, dldW);
     W_new = cellfun(cellfun_sub, W_old, W_step);
+    W_new = cellfun(cellfun_boundW, W_new);
     
     b_step = cellfun(cellfun_scale, dldb);
     b_new = cellfun(cellfun_sub, b_old, b_step);
@@ -172,7 +211,7 @@ for iter = 1:maxIters
     R_new = R(W_new, b_new);
     R_all(iter+1) = R_new;  
     disp(['Iter: ' num2str(iter) '  Grad: ' num2str(norm(packNN(dldW, dldb)), '%05f') '  Risk: ' num2str(R_new, '%05f')])
-    if abs(R_new - R_old) < thres
+    if abs(R_new - R_old) < convThres
         converged = true;
         break;
     end

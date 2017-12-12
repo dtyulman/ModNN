@@ -1,5 +1,5 @@
 %% load data
-%{
+%-{
 datapath = 'MNIST/';
 Ntr = 200; %N samples of each digit
 Nte = 150;
@@ -11,7 +11,7 @@ Ndigits = length(digits);
 %% evaluate clustering results
 
 
-for Nc = 10 %[0, 2, 5, 10] %number of clusters. Nc==0 automatically finds optimal number of clusters
+for Nc = 0 %[0, 2, 5, 10] %number of clusters. Nc==0 automatically finds optimal number of clusters
     % cluster       
     if Nc == 0
         alpha = 0.0005;

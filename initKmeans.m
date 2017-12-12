@@ -7,7 +7,7 @@ elseif nargin == 3
     if isempty(Xtr_loaded)
         save(seedfile, '-append', 'Xtr')
     else
-        if size(Xtr) ~= size(Xtr_loaded) || ~all(Xtr(:) == Xtr_loaded(:))
+        if ~all(size(Xtr) == size(Xtr_loaded)) || ~all(Xtr(:) == Xtr_loaded(:))
             error('This seed file is for a different training set')
         end
     end

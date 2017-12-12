@@ -18,6 +18,9 @@ if nargin < 7 || isempty(r)
     r = 2; %layer number that contains the representation of Xtr in "neural network" space
 end
 
+if size(Xtr,2) == 748
+    error('Input Xtr dimension is not the dimension of MNIST')
+end
 
 % load or train fully connected network on training data
 seedfile = 'mnist2nn.mat';
@@ -27,8 +30,9 @@ bvar = ['b', layerStr];
 S = load(seedfile, Wvar, bvar);
 if length(struct2array(S)) == 2*length(layers) %if dims match up, load them
     eval(sprintf('W=S.%s; b=S.%s;', Wvar, bvar))
-    fprintf('Loaded %s, %s\n', Wvar, bvar)
+    fprintf('mnist2nn: loaded %s, %s\n', Wvar, bvar)
 else 
+    warning('mnist2nn: no saved network (%s, %s) found. Training.', Wvar, bvar)
     [W, b] = initNN(layers, 'initseed.mat');
     
     [W, b, ~, riskValid, niters] = ...

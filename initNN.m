@@ -28,7 +28,7 @@ elseif nargin == 2 %TODO: I can actually do this by just seeding the RNG...
     if length(struct2array(S)) == 2*length(layers) 
         %if dims match up, load them
         eval(sprintf('W=S.%s; b=S.%s;', Wvar, bvar))
-        fprintf('Loaded %s, %s\n', Wvar, bvar)
+        fprintf('initNN: Loaded %s, %s\n', Wvar, bvar)
     else
         %if not, they don't exist, so create and save them
         warning('NN with desired size doesn''t exist in seedfile. Creating and appending.')
