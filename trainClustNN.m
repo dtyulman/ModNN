@@ -1,4 +1,4 @@
-function [W_all, b_all, centroids, R_all, iter, f_thres] = ...
+function [W_all, b_all, centroids, R_all, iter, thres_f, fth, fraw] = ...
     trainClustNN(W_init, b_init, Xtr, Ytr, Xv, Yv, clust, splits, eta, Wlims, binDelta, f, convThres, batchSize, maxIters)
 % W is a cell array, so that W{r} is the weight matrix for layer r. If
 %   layer r has n neurons and layer r-1 has m neurons, W{r} is m-by-n
@@ -67,7 +67,7 @@ if Wmin > -inf || Wmax < inf
     fprintf('Limiting weights to range [%g, %g]\n', Wmin, Wmax)
 end
 if binDelta
-    fprintf('Binarizing delta W')
+    fprintf('Binarizing dldW\n')
 end
 
 cellfun_add = @(C1,C2){C1+C2};
@@ -136,7 +136,6 @@ if Wmin >= Wmax
     error('Lower bound on W must be less than upper bound')
 end
 
-
 %% cluster
 if isscalar(clust)
     [Xtr_clust, centroids] = kmeans(Xtr, Nc);
@@ -158,6 +157,11 @@ R_new = R(W_new, b_new);
 R_all = nan(1,maxIters+1);
 R_all(1) = R_new;
 
+thres_f = nan(1,maxIters+1);
+fth = nan(1,maxIters+1);
+fraw = nan(1,maxIters+1);
+
+
 rng(1) %make SGD replicable by seeding the random number generator
 
 converged = false;
@@ -165,7 +169,7 @@ for iter = 1:maxIters
     W_old = W_new; 
     b_old = b_new;
     
-    %%
+    %% minibatch gradient
     dldW = cellfun(cellfun_zero, W_new); %initialize gradient to zero
     dldb = cellfun(cellfun_zero, b_new);
     for b = 1:batchSize
@@ -178,7 +182,7 @@ for iter = 1:maxIters
         [x,y,c] = deal(Xtr(i,:), Ytr(i,:), Xtr_clust(i));
 
         %activate subnetwork based on cluster
-        [W_sub, b_sub, idxs] = activateSubnet(W_old, b_old, c, Nc, splits, false);
+        [W_sub, b_sub, idxs] = activateSubnet(W_old, b_old, c, Nc, splits, true);
 
         %compute gradient with feedforward+backprop
         [dldW_i, dldb_i] = gradient(W_sub, b_sub, x, y);  
@@ -189,10 +193,23 @@ for iter = 1:maxIters
         %accumulate the gradient
         dldW = cellfun(cellfun_add, dldW, dldW_i);
         dldb = cellfun(cellfun_add, dldb, dldb_i);
+        
+        %DEBUG
+%         (sum(sum(dldW_i{2})==0)+sum(sum(dldW_i{3})==0))/110 %number of empty columns 
+%         dldWpacked = packNN(dldW_i,cell(size(dldW_i)));
+%         sum(dldWpacked==0)/length(dldWpacked) %number of zero entries in dldW_i
     end 
-    %%  
        
-    %update parameters
+    %% update parameters
+    
+    %DEBUG
+%     (sum(sum(dldW{2})==0)+sum(sum(dldW{3})==0))/110 %number of empty columns   
+%     dldWpacked = packNN(dldW,cell(size(dldW)));
+%     sum(dldWpacked==0)/length(dldWpacked) %number of zero entries in batch
+
+    dldWpacked = packNN(dldW,cell(size(dldW)));
+    fraw(iter+1) = sum(dldWpacked~=0)/length(dldWpacked);
+    [dldW, thres_f(iter+1), fth(iter+1)] = sparsify(dldW, f);
     if binDelta
         dldW = cellfun(cellfun_binarize, dldW);
     end
@@ -220,12 +237,17 @@ end
 W_all = W_all(1:iter+1); %crop unused memory slots
 b_all = b_all(1:iter+1);
 R_all = R_all(1:iter+1);
+thres_f = thres_f(1:iter+1);
+fth = fth(1:iter+1);
+fraw = fraw(1:iter+1);
+
 if ~converged
     warning('Reached maxIters without convergence.')
 end
 
 end
 
+%% Helper functions
 function [dldW, dldb] = gradient(W, b, x, y)
     L = length(W);
     
@@ -247,6 +269,48 @@ function [dldW, dldb] = gradient(W, b, x, y)
     end 
 end
 
+%%
+function [Wsparse, th, fth] = sparsify(W, f)
+% Find a threshold th below which to set entries of cell array W to zero
+% such that fraction f of thresholded array Wsparse are nonzero
+
+%concatenate W into a single vector for sanity
+[Wvec, layers] = packNN(W,cell(size(W)));
+N = length(Wvec);
+absWvec = abs(Wvec);
+
+lo = min(absWvec);
+hi = max(absWvec);
+th = mean(absWvec);
+fth = sum(absWvec>th)/N;
+while fth ~= f %binary search
+    if fth < f
+        hi = th;       
+    else
+        lo = th;
+    end
+    th = (lo+hi)/2;
+    
+    fth_new = sum(absWvec>th)/N;
+    if fth == fth_new
+        %fth is as close to f as it can be, but not equal to it due to resolution of fraction
+        break
+    end    
+    fth = fth_new;
+end
+
+Wvec=Wvec.*(absWvec>th);
+
+%reshape W back into a cell array
+L = length(layers);
+Wsparse = cell(1, L);
+t=1;
+for r = 2:L
+    Wsparse{r} = reshape(Wvec(t:t+layers(r-1)*layers(r)-1), layers(r-1), layers(r));
+    t=t+layers(r-1)*layers(r);
+end
+
+end
 
 
 
