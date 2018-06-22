@@ -16,8 +16,7 @@ if nargin == 1
     W = cell(1, L);
     b = cell(1, L);
     for r = 2:L
-        W{r} = random('Normal', 0, 1/sqrt(layers(r-1)), layers(r-1), layers(r));
-    %     b{r} = random('Normal', 0, 1/sqrt(layers(r-1)), layers(r), 1);
+        W{r} = random('Normal', 0, .01/sqrt(layers(r-1)), layers(r-1), layers(r));
         b{r} = zeros(layers(r), 1);
     end
 elseif nargin == 2 %TODO: I can actually do this by just seeding the RNG...

@@ -33,16 +33,18 @@ if length(struct2array(S)) == 2*length(layers) %if dims match up, load them
     fprintf('mnist2nn: loaded %s, %s\n', Wvar, bvar)
 else 
     warning('mnist2nn: no saved network (%s, %s) found. Training.', Wvar, bvar)
-    [W, b] = initNN(layers, 'initseed.mat');
+    [W_init, b_init] = initNN(layers, 'initseed.mat');
     
     [W, b, ~, riskValid, niters] = ...
-                trainClustNN(W, b, Xtr, Ytr, Xv, Yv, [], [], eta, thres, batchSize, maxIters);
+                trainClustNN(W_init, b_init, Xtr, Ytr, Xv, Yv, [], [], eta, [], [], [], thres, batchSize, maxIters);
+            
     W = W{end};
     b = b{end};
     
     eval(sprintf('%s=W; %s=b;', Wvar, bvar));
     save(seedfile, '-append', Wvar, bvar);
 end
+
 
 
 % for each data point, read out the activities of the first hidden layer to
@@ -62,3 +64,13 @@ for i = 1:size(Xvnn,1)
     a = feedforward(W, b, Xv(i,:));    
     Xvnn(i,:) =  a{r}';
 end
+
+% Normalize to range [-1, 1]
+% normMax = max([Xtrnn(:); Xvnn(:); Xtenn(:)]);
+% normMin = min([Xtrnn(:); Xvnn(:); Xtenn(:)]);
+% Xtrnn = 2*Xtrnn/(normMax-normMin)-1;
+% Xvnn = 2*Xvnn/(normMax-normMin)-1;
+% Xtenn = 2*Xtenn/(normMax-normMin)-1;
+
+
+

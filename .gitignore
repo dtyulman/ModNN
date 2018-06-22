@@ -1,4 +1,8 @@
 *.m~
+*.mat
+*.csv
+*.fig
+*.pptx
 
 # OS generated files #
 ######################

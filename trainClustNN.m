@@ -36,10 +36,10 @@ end
 if nargin < 13  || isempty(convThres)
     convThres = 0.1;
 end
-if nargin < 12
+if nargin < 12 || isempty(f)
     f = 1; %all Ws nonzero
 end
-if nargin < 11
+if nargin < 11 || isempty(binDelta)
     binDelta = false;
 end
 if nargin < 10 || isempty(Wlims)
@@ -68,6 +68,9 @@ if Wmin > -inf || Wmax < inf
 end
 if binDelta
     fprintf('Binarizing dldW\n')
+end
+if f < 1
+    fprintf('Sparsifying to f=%g\n', f)
 end
 
 cellfun_add = @(C1,C2){C1+C2};
@@ -162,7 +165,7 @@ fth = nan(1,maxIters+1);
 fraw = nan(1,maxIters+1);
 
 
-rng(1) %make SGD replicable by seeding the random number generator
+% rng(1) %make SGD replicable by seeding the random number generator
 
 converged = false;
 for iter = 1:maxIters
@@ -182,7 +185,8 @@ for iter = 1:maxIters
         [x,y,c] = deal(Xtr(i,:), Ytr(i,:), Xtr_clust(i));
 
         %activate subnetwork based on cluster
-        [W_sub, b_sub, idxs] = activateSubnet(W_old, b_old, c, Nc, splits, true);
+        verbose = false;
+        [W_sub, b_sub, idxs] = activateSubnet(W_old, b_old, c, Nc, splits, verbose);
 
         %compute gradient with feedforward+backprop
         [dldW_i, dldb_i] = gradient(W_sub, b_sub, x, y);  
@@ -209,7 +213,9 @@ for iter = 1:maxIters
 
     dldWpacked = packNN(dldW,cell(size(dldW)));
     fraw(iter+1) = sum(dldWpacked~=0)/length(dldWpacked);
-    [dldW, thres_f(iter+1), fth(iter+1)] = sparsify(dldW, f);
+    if f < 1
+        [dldW, thres_f(iter+1), fth(iter+1)] = sparsify(dldW, f);
+    end
     if binDelta
         dldW = cellfun(cellfun_binarize, dldW);
     end
@@ -238,8 +244,8 @@ W_all = W_all(1:iter+1); %crop unused memory slots
 b_all = b_all(1:iter+1);
 R_all = R_all(1:iter+1);
 thres_f = thres_f(1:iter+1);
-fth = fth(1:iter+1);
-fraw = fraw(1:iter+1);
+fth = fth(2:iter+1);
+fraw = fraw(2:iter+1);
 
 if ~converged
     warning('Reached maxIters without convergence.')

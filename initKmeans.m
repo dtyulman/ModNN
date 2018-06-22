@@ -1,7 +1,9 @@
 function centroids = initKmeans(Xtr, Nc, seedfile)
 
 if nargin == 2
+    warning('OFF', 'stats:kmeans:FailedToConverge')
     [~, centroids] = kmeans(Xtr, Nc, 'MaxIter', 0);
+    warning('ON')
 elseif nargin == 3
     Xtr_loaded = struct2array(load(seedfile, 'Xtr'));
     if isempty(Xtr_loaded)
